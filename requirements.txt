@@ -1,1 +1,7 @@
 streamlit==1.22.0
+standard-imghdr
+plotly
+seaborn
+pandas
+matplotlib
+requests

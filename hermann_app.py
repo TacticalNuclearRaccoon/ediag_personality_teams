@@ -3,9 +3,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
 import matplotlib.pyplot as plt
-import re
 import seaborn as sns
-import os
 import requests
 
 DATABASE_URL = st.secrets["DATABASE_URL"]

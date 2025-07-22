@@ -5,6 +5,7 @@ import plotly.express as px
 import matplotlib.pyplot as plt
 import seaborn as sns
 import requests
+import json
 
 DATABASE_URL = st.secrets["DATABASE_URL"]
 DATABASE_API_KEY = st.secrets["DATABASE_API_KEY"]
@@ -23,7 +24,7 @@ def fetch_results_from_database():
         "Content-Type": "application/json",
     }
     params = {
-        "select": "user,organisation,A_score,B_score,C_score,D_score"
+        "select": "user,organisation,A_score,B_score,C_score,D_score, evaluation"
     }
     response = requests.get(url, headers=headers, params=params)
     print(response.status_code, response.text)
@@ -45,11 +46,11 @@ df = df.set_index("Person")
 #st.dataframe(data=df)
 # Sidebar for user interaction
 
-selected_view = st.sidebar.radio("Choisir une analyse:", ["Profil individuel", "Profil moyen de l'équipe", "Styles dominants", "Déviations", "Heatmap"])
+selected_view = st.sidebar.radio("Choisir une analyse:", ["Profil individuel", "Profil moyen de l'équipe", "Styles dominants", "Déviations", "Les autres"])
 
 
 # Radar chart helper
-def radar_chart(name, scores):
+def radar_chart(name, scores, color='lightblue'):
     # Create figure
     fig = go.Figure()
 
@@ -59,7 +60,7 @@ def radar_chart(name, scores):
         theta=['A', 'B', 'C', 'D'],
         fill='toself',
         name=name,
-        line=dict(color='lightblue', width=2)
+        line=dict(color=color, width=2)
     ))
 
     # Update layout
@@ -239,13 +240,65 @@ elif selected_view == "Déviations":
 
 #   st.pyplot(fig)
 
-elif selected_view == "Heatmap":
-    df_heatmap = df.drop(columns=["Organisation", "PersonLabel"])
-    fig_everyone, ax_everyone = plt.subplots(figsize=(5,5))
-    sns.heatmap(df_heatmap,annot=True, linewidths=.5, ax=ax_everyone, xticklabels=True, cbar=True, cmap="BuPu", fmt='.1f')
-    plt.tight_layout()
-    col_heat1, col_heat2 = st.columns(2)
-    with col_heat1:
-        st.pyplot(fig_everyone)
-    with col_heat2:
-        st.dataframe(data=df_heatmap)
+elif selected_view == "Les autres":
+    selected_person = st.selectbox("Sélectionner un membre de l'équipe:", df.index.tolist())
+    if selected_person:
+        st.header(f"L'équipe selon {selected_person}")
+
+        person_evaluations_data = df.loc[selected_person, "evaluation"]
+
+        if person_evaluations_data is None or pd.isna(person_evaluations_data):
+            st.info(f"Pas de données d'évaluation croisée pour {selected_person}.")
+        else:
+            person_evaluations_dict = None
+            if isinstance(person_evaluations_data, str):
+                try:
+                    person_evaluations_dict = json.loads(person_evaluations_data)
+                except json.JSONDecodeError:
+                    st.error("Impossible de parser les données d'évaluation (JSON mal formaté).")
+                    st.write("Données reçues:", person_evaluations_data)
+            elif isinstance(person_evaluations_data, dict):
+                person_evaluations_dict = person_evaluations_data
+
+            if not person_evaluations_dict or not isinstance(person_evaluations_dict, dict):
+                st.warning(f"Les données d'évaluation pour {selected_person} ne sont pas dans un format correct (attendu: dictionnaire).")
+                st.write("Données reçues:", person_evaluations_data)
+            else:
+                names = set()
+                for key in person_evaluations_dict.keys():
+                    parts = key.split('_', 1)
+                    if len(parts) == 2:
+                        quadrant, name = parts
+                        if quadrant in ['A', 'B', 'C', 'D']:
+                            names.add(name)
+
+                if not names:
+                    st.warning(f"Le dictionnaire d'évaluation pour {selected_person} est vide ou ne contient pas de données exploitables.")
+                    st.write(person_evaluations_dict)
+                else:
+                    for name in sorted(list(names)):
+                        col1, col2 = st.columns(2)
+
+                        with col1:
+                            scores_by_other = [
+                                person_evaluations_dict.get(f'A_{name}', 0) * 25,
+                                person_evaluations_dict.get(f'B_{name}', 0) * 25,
+                                person_evaluations_dict.get(f'C_{name}', 0) * 25,
+                                person_evaluations_dict.get(f'D_{name}', 0) * 25
+                            ]
+                            fig_by_other = radar_chart(name, scores_by_other, color='mediumpurple')
+                            title_by_other = f"Profil de {name}<br>(vu par {selected_person})"
+                            fig_by_other.update_layout(title=dict(text=title_by_other, font=dict(size=16)))
+                            st.plotly_chart(fig_by_other, use_container_width=True)
+
+                        with col2:
+                            if name in df.index:
+                                real_scores = df.loc[name, ["A", "B", "C", "D"]].tolist()
+                                fig_real = radar_chart(name, real_scores, color='lightblue')
+                                title_real = f"Profil de {name}<br>(auto-évaluation)"
+                                fig_real.update_layout(title=dict(text=title_real, font=dict(size=16)))
+                                st.plotly_chart(fig_real, use_container_width=True)
+                            else:
+                                st.warning(f"Le profil de {name} n'a pas pu être trouvé.")
+    else:
+        st.warning("Veuillez sélectionner un membre de l'équipe.")

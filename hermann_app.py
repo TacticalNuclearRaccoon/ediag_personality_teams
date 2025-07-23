@@ -161,7 +161,8 @@ elif selected_view == "Styles dominants":
 # View 5: Déviations
 elif selected_view == "Déviations":
     # Heatmap
-    df_scores = df.drop(columns=["PersonLabel", "Organisation"])
+    df_scores = df.drop(columns=["PersonLabel", "Organisation", "evaluation"])
+    #st.dataframe(data=df_scores)
 
     # Standardize (Z-score) so deviations stand out
     df_norm = (df_scores - df_scores.mean()) / df_scores.std()
@@ -199,11 +200,11 @@ elif selected_view == "Déviations":
             lower_bound = Q1 - 1.5 * IQR
             upper_bound = Q3 + 1.5 * IQR
 
-            # Find persons with scores outside the bounds
-            for index, row in df.iterrows():
-                score = row[quadrant]
-                if score < lower_bound or score > upper_bound:
-                    outlier_info.append(f"- '{index}' a un score divergeant {score} pour le Quadrant {quadrant}")
+        # Find persons with scores outside the bounds
+        for index, row in df.iterrows():
+            score = row[quadrant]
+            if score < lower_bound or score > upper_bound:
+                outlier_info.append(f"- '{index}' a un score divergeant {score} pour le Quadrant {quadrant}")
 
         if outlier_info:
             for info in outlier_info:

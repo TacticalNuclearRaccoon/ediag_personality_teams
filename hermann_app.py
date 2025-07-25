@@ -17,7 +17,7 @@ try:
 except:
     st.image("Banniere argios.png", use_column_width=True)
 
-st.title("Outil d'analyze pour le e-diagnostic des personnalités")
+st.title("Outil d'analyse pour le e-diagnostic des personnalités")
 
 
 def fetch_results_from_database():
@@ -119,7 +119,7 @@ elif selected_view == "Styles dominants":
     # Debug: Show raw dominant values for each person
     #st.write("Raw dominant values per person:")
     #st.write(df[['A', 'B', 'C', 'D']])
-    st.write("Calculated dominant quadrant per person:")
+    st.write("Quadrant dominant calculé par personne:")
     st.write(df['Dominant'])
     
     # Create pie chart of dominant styles distribution
@@ -191,9 +191,15 @@ elif selected_view == "Déviations":
     with col_div1:
         st.pyplot(fig_diverge)
     with col_div2:
-        st.subheader("Scores moyennes par quandrant")
+        st.markdown("""Légende \n:
+- **Chaque case** représente le score d’un membre de l’équipe pour un quadrant (A, B, C, D), standardisé (Z-score) par rapport à la moyenne de l’équipe.
+- **Couleurs chaudes (rouge/rose)** : Score supérieur à la moyenne de l’équipe pour ce quadrant.
+- **Couleurs froides (bleu)** : Score inférieur à la moyenne de l’équipe pour ce quadrant.
+- **Blanc ou proche du gris** : Score proche de la moyenne de l’équipe.
+- **Valeur affichée** : Score brut du membre pour ce quadrant.""")
+        #st.subheader("Scores moyennes par quandrant")
         meanz = pd.DataFrame(df[["A", "B", "C", "D"]].mean(), columns=["Valeur moyenne dans l'équipe"])
-        st.dataframe(data=meanz)
+        #st.dataframe(data=meanz)
         # Calculate outlier boundaries and identify outliers
         outlier_info = []
         for quadrant in quadrant_labels:
@@ -214,7 +220,7 @@ elif selected_view == "Déviations":
             for info in outlier_info:
                 st.write(info)
         else:
-            st.write("Aucune valeur divergeante détectée")
+            st.write(":cherry_blossom: ***Aucune valeur divergeante détectée***")
 
 
     # Dumbbell Plot or Slope Chart (Person vs. Team Average)

@@ -12,6 +12,10 @@ DATABASE_API_KEY = st.secrets["DATABASE_API_KEY"]
 icon = "Favicon_2x.ico"
 st.set_page_config(layout='wide', page_icon=icon, page_title="Outil d’analyse Bousole des personnalités")
 
+try:
+    st.image("Banniere argios.png", use_container_width=True)
+except:
+    st.image("Banniere argios.png", use_column_width=True)
 
 st.title("Outil d'analyze pour le e-diagnostic des personnalités")
 

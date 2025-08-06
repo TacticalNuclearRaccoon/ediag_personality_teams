@@ -1,7 +1,9 @@
-streamlit==1.22.0
+streamlit
 standard-imghdr
 plotly
 seaborn
 pandas
 matplotlib
 requests
+networkx
+scikit-learn

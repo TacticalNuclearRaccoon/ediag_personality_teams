@@ -321,7 +321,7 @@ elif selected_view == "Styles dominants":
     # Debug: Show raw dominant values for each person
     #st.write("Raw dominant values per person:")
     #st.write(df[['A', 'B', 'C', 'D']])
-    st.write("Quadrant dominant calculé par personne:")
+    st.write("Cadran dominant calculé par personne:")
     st.write(df['Dominant'])
     
     # Create pie chart of dominant styles distribution
@@ -329,11 +329,11 @@ elif selected_view == "Styles dominants":
     
     # For debugging/displaying the counts
     dominant_counts_df_display = dominant_counts_series.reset_index()
-    dominant_counts_df_display.columns = ['Quadrant', 'Nombre de personnes']
+    dominant_counts_df_display.columns = ['Cadran', 'Nombre de personnes']
 
     # Get values and names as lists
     df_values = dominant_counts_df_display['Nombre de personnes'].tolist()
-    df_names = dominant_counts_df_display['Quadrant'].tolist()
+    df_names = dominant_counts_df_display['Cadran'].tolist()
 
     # Define colors for each quadrant
     quadrant_colors = {
@@ -357,7 +357,7 @@ elif selected_view == "Styles dominants":
         wedgeprops={'edgecolor':'white', 'width':0.7},
     )
     ax.axis('equal')
-    ax.set_title("Distribution of Dominant Quadrants", color='white', fontsize=12)
+    ax.set_title("Distribution of Dominant Cadran", color='white', fontsize=12)
     col1, col2 = st.columns(2)
     with col1:
         st.pyplot(fig)
@@ -373,13 +373,13 @@ elif selected_view == "Déviations":
     # Standardize (Z-score) so deviations stand out
     df_norm = (df_scores - df_scores.mean()) / df_scores.std()
 
-    melted = df[["A", "B", "C", "D"]].melt(var_name="Quadrant", value_name="Score")
+    melted = df[["A", "B", "C", "D"]].melt(var_name="Cadran", value_name="Score")
     # this same data can be used in the boxplot
     quadrant_data = [
-        melted[melted['Quadrant'] == 'A']['Score'].values,
-        melted[melted['Quadrant'] == 'B']['Score'].values,
-        melted[melted['Quadrant'] == 'C']['Score'].values,
-        melted[melted['Quadrant'] == 'D']['Score'].values
+        melted[melted['Cadran'] == 'A']['Score'].values,
+        melted[melted['Cadran'] == 'B']['Score'].values,
+        melted[melted['Cadran'] == 'C']['Score'].values,
+        melted[melted['Cadran'] == 'D']['Score'].values
     ]
 
     quadrant_labels = ['A', 'B', 'C', 'D']
@@ -405,7 +405,7 @@ elif selected_view == "Déviations":
         # Calculate outlier boundaries and identify outliers
         outlier_info = []
         for quadrant in quadrant_labels:
-            scores = melted[melted['Quadrant'] == quadrant]['Score']
+            scores = melted[melted['Cadran'] == quadrant]['Score']
             Q1 = scores.quantile(0.25)
             Q3 = scores.quantile(0.75)
             IQR = Q3 - Q1
@@ -416,7 +416,7 @@ elif selected_view == "Déviations":
         for index, row in df.iterrows():
             score = row[quadrant]
             if score < lower_bound or score > upper_bound:
-                outlier_info.append(f"- '{index}' a un score divergeant {score} pour le Quadrant {quadrant}")
+                outlier_info.append(f"- '{index}' a un score divergeant {score} pour le Cadran {quadrant}")
 
         if outlier_info:
             for info in outlier_info:
@@ -426,7 +426,7 @@ elif selected_view == "Déviations":
 
 
     # Dumbbell Plot or Slope Chart (Person vs. Team Average)
-    st.subheader("Deviation par rapport à la moyenne de l'équipe par Quadrant")
+    st.subheader("Deviation par rapport à la moyenne de l'équipe par Cadran")
     st.write("Score de la personne et la déviation par rapport à la moyenne de l'équipe")
     categories = ["A", "B", "C", "D"]
     avg_scores = df_scores.mean()
@@ -435,7 +435,7 @@ elif selected_view == "Déviations":
         axs[i].hlines(y=df_scores.index, xmin=avg_scores[cat], xmax=df_scores[cat], color='grey', alpha=0.5)
         axs[i].plot(df_scores[cat], df_scores.index, "o", label="Score")
         axs[i].vlines(avg_scores[cat], 0, len(df_scores), color="red", linestyles="dashed", label="Moyenne")
-        axs[i].set_title(f"Quadrand {cat}")
+        axs[i].set_title(f"Cadran {cat}")
         axs[i].set_xlabel("Score")
         if i == 0:
             axs[i].legend()

@@ -69,7 +69,7 @@ def polygon_layout(G, radius=3):
     return pos
 
 # function to create network graph with color-coded edges
-def visualize_compatibility_network_colored(compatibility_matrix, threshold=50):
+def visualize_compatibility_network_colored(compatibility_matrix, threshold=1):
     """
     Visualize compatibility using a networkx graph with color-coded edges and polygon layout.
 
@@ -96,10 +96,10 @@ def visualize_compatibility_network_colored(compatibility_matrix, threshold=50):
 
     # Edge weights
     edge_weights = [G[u][v]['weight'] for u, v in G.edges()]
-    edge_widths = [w / 10 for w in edge_weights]
+    edge_widths = [w / 1 for w in edge_weights]
 
     # Edge color map
-    norm = mcolors.Normalize(vmin=threshold, vmax=100)
+    norm = mcolors.Normalize(vmin=threshold, vmax=5)
     cmap = cm.get_cmap('RdYlGn')
     edge_colors = [cmap(norm(score)) for score in edge_weights]
 
@@ -107,7 +107,7 @@ def visualize_compatibility_network_colored(compatibility_matrix, threshold=50):
     fig, ax = plt.subplots(figsize=(8, 8))
     nx.draw_networkx_nodes(G, pos, node_color='lightblue', edgecolors='black', node_size=1000)
     nx.draw_networkx_edges(G, pos, width=edge_widths, edge_color=edge_colors)
-    nx.draw_networkx_labels(G, pos, font_weight='bold', font_size=10)
+    nx.draw_networkx_labels(G, pos, font_weight='bold', font_size=12)
 
     # Edge labels
     edge_labels = {(u, v): f"{G[u][v]['weight']:.0f}" for u, v in G.edges()}
@@ -180,6 +180,59 @@ def calculate_compatibility_scores(df, threshold=70, bridge_bonus=20, penalty=-3
 
             # Clip score between 0 and 100
             compatibility_matrix.loc[person1, person2] = round(np.clip(score, 0, 100), 2)
+
+    return compatibility_matrix
+
+
+def calculate_compatibility_scores_on_five(df, threshold=70, bridge_bonus=20, penalty=-30, base_score=50):
+    compatibility_matrix = pd.DataFrame(0.0, index=df.index, columns=df.index)
+
+    for person1 in df.index:
+        for person2 in df.index:
+            if person1 == person2:
+                compatibility_matrix.loc[person1, person2] = 5.0
+                continue
+
+            row1 = df.loc[person1]
+            row2 = df.loc[person2]
+
+            dom1 = get_dominant_quadrant(row1, threshold)
+            dom2 = get_dominant_quadrant(row2, threshold)
+
+            score = 0
+
+            # Determine base compatibility
+            incompatible_pairs = {
+                ('A', 'C'): ('B', 'D'),
+                ('C', 'A'): ('B', 'D'),
+                ('D', 'B'): ('A', 'C'),
+                ('B', 'D'): ('A', 'C')
+            }
+
+            if dom1 and dom2:
+                if (dom1, dom2) in incompatible_pairs:
+                    # Check for common bridge
+                    bridges = incompatible_pairs[(dom1, dom2)]
+                    shared_bridge = any(
+                        row1[bridge] > threshold and row2[bridge] > threshold
+                        for bridge in bridges
+                    )
+                    if shared_bridge:
+                        score += base_score + bridge_bonus
+                    else:
+                        score += base_score + penalty
+                else:
+                    score += base_score
+
+            # Add similarity component (cosine similarity of the 4-quadrant vectors)
+            vec1 = np.array([row1[q] for q in ['A', 'B', 'C', 'D']]).reshape(1, -1)
+            vec2 = np.array([row2[q] for q in ['A', 'B', 'C', 'D']]).reshape(1, -1)
+            similarity = cosine_similarity(vec1, vec2)[0][0]  # range: 0 to 1
+            score += similarity * 50  # scale similarity to 0–50
+
+            # Scale score from 0–100 to 1–5
+            scaled_score = (np.clip(score, 0, 100) / 100) * 4 + 1
+            compatibility_matrix.loc[person1, person2] = round(scaled_score, 2)
 
     return compatibility_matrix
 
@@ -268,7 +321,7 @@ elif selected_view == "Styles dominants":
     # Debug: Show raw dominant values for each person
     #st.write("Raw dominant values per person:")
     #st.write(df[['A', 'B', 'C', 'D']])
-    st.write("Quadrant dominant calculé par personne:")
+    st.write("Cadran dominant calculé par personne:")
     st.write(df['Dominant'])
     
     # Create pie chart of dominant styles distribution
@@ -276,11 +329,11 @@ elif selected_view == "Styles dominants":
     
     # For debugging/displaying the counts
     dominant_counts_df_display = dominant_counts_series.reset_index()
-    dominant_counts_df_display.columns = ['Quadrant', 'Nombre de personnes']
+    dominant_counts_df_display.columns = ['Cadran', 'Nombre de personnes']
 
     # Get values and names as lists
     df_values = dominant_counts_df_display['Nombre de personnes'].tolist()
-    df_names = dominant_counts_df_display['Quadrant'].tolist()
+    df_names = dominant_counts_df_display['Cadran'].tolist()
 
     # Define colors for each quadrant
     quadrant_colors = {
@@ -304,7 +357,7 @@ elif selected_view == "Styles dominants":
         wedgeprops={'edgecolor':'white', 'width':0.7},
     )
     ax.axis('equal')
-    ax.set_title("Distribution of Dominant Quadrants", color='white', fontsize=12)
+    ax.set_title("Distribution of Dominant Cadran", color='white', fontsize=12)
     col1, col2 = st.columns(2)
     with col1:
         st.pyplot(fig)
@@ -320,13 +373,13 @@ elif selected_view == "Déviations":
     # Standardize (Z-score) so deviations stand out
     df_norm = (df_scores - df_scores.mean()) / df_scores.std()
 
-    melted = df[["A", "B", "C", "D"]].melt(var_name="Quadrant", value_name="Score")
+    melted = df[["A", "B", "C", "D"]].melt(var_name="Cadran", value_name="Score")
     # this same data can be used in the boxplot
     quadrant_data = [
-        melted[melted['Quadrant'] == 'A']['Score'].values,
-        melted[melted['Quadrant'] == 'B']['Score'].values,
-        melted[melted['Quadrant'] == 'C']['Score'].values,
-        melted[melted['Quadrant'] == 'D']['Score'].values
+        melted[melted['Cadran'] == 'A']['Score'].values,
+        melted[melted['Cadran'] == 'B']['Score'].values,
+        melted[melted['Cadran'] == 'C']['Score'].values,
+        melted[melted['Cadran'] == 'D']['Score'].values
     ]
 
     quadrant_labels = ['A', 'B', 'C', 'D']
@@ -352,7 +405,7 @@ elif selected_view == "Déviations":
         # Calculate outlier boundaries and identify outliers
         outlier_info = []
         for quadrant in quadrant_labels:
-            scores = melted[melted['Quadrant'] == quadrant]['Score']
+            scores = melted[melted['Cadran'] == quadrant]['Score']
             Q1 = scores.quantile(0.25)
             Q3 = scores.quantile(0.75)
             IQR = Q3 - Q1
@@ -363,7 +416,7 @@ elif selected_view == "Déviations":
         for index, row in df.iterrows():
             score = row[quadrant]
             if score < lower_bound or score > upper_bound:
-                outlier_info.append(f"- '{index}' a un score divergeant {score} pour le Quadrant {quadrant}")
+                outlier_info.append(f"- '{index}' a un score divergeant {score} pour le Cadran {quadrant}")
 
         if outlier_info:
             for info in outlier_info:
@@ -373,7 +426,7 @@ elif selected_view == "Déviations":
 
 
     # Dumbbell Plot or Slope Chart (Person vs. Team Average)
-    st.subheader("Deviation par rapport à la moyenne de l'équipe par Quadrant")
+    st.subheader("Deviation par rapport à la moyenne de l'équipe par Cadran")
     st.write("Score de la personne et la déviation par rapport à la moyenne de l'équipe")
     categories = ["A", "B", "C", "D"]
     avg_scores = df_scores.mean()
@@ -382,7 +435,7 @@ elif selected_view == "Déviations":
         axs[i].hlines(y=df_scores.index, xmin=avg_scores[cat], xmax=df_scores[cat], color='grey', alpha=0.5)
         axs[i].plot(df_scores[cat], df_scores.index, "o", label="Score")
         axs[i].vlines(avg_scores[cat], 0, len(df_scores), color="red", linestyles="dashed", label="Moyenne")
-        axs[i].set_title(f"Quandrant {cat}")
+        axs[i].set_title(f"Cadran {cat}")
         axs[i].set_xlabel("Score")
         if i == 0:
             axs[i].legend()
@@ -404,7 +457,7 @@ elif selected_view == "Compatibilité":
     st.subheader("Analyse de compatibilité entre les membres de l'équipe")
     df_scores = df.drop(columns=["PersonLabel", "Organisation", "evaluation"])
     # Calculate compatibility scores
-    similarity_matrix = calculate_compatibility_scores(df_scores)
+    similarity_matrix = calculate_compatibility_scores_on_five(df_scores)
     comp_col1, comp_col2 = st.columns(2)
     with comp_col1:
         st.subheader("Réseau de compatibilité")
@@ -424,7 +477,7 @@ elif selected_view == "Compatibilité":
         st.pyplot(fig_comp)
         st.markdown("""
 * Chaque case représente le score de compatibilité entre deux membres de l'équipe.
-* Les scores vont de 0 (aucune compatibilité) à 100 (compatibilité parfaite).""")
+* Les scores vont de 0 (aucune compatibilité) à 5 (compatibilité parfaite).""")
 
 elif selected_view == "Les autres":
     selected_person = st.selectbox("Sélectionner un membre de l'équipe:", df.index.tolist())

@@ -100,7 +100,13 @@ def visualize_compatibility_network_colored(compatibility_matrix, threshold=1):
 
     # Edge color map
     norm = mcolors.Normalize(vmin=threshold, vmax=5)
-    cmap = cm.get_cmap('RdYlGn')
+    colors = ['red', 'tomato', 'darkorange', 'orange', 'yellow','y', 'yellowgreen', 'limegreen', 'darkgreen']
+    bounds = [1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5]
+
+    # Create colormap and normalization
+    cmap = mcolors.ListedColormap(colors)
+    norm = mcolors.BoundaryNorm(bounds, cmap.N)
+
     edge_colors = [cmap(norm(score)) for score in edge_weights]
 
     # Draw the network

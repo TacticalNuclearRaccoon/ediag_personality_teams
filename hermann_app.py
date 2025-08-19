@@ -458,6 +458,12 @@ elif selected_view == "Compatibilité":
     df_scores = df.drop(columns=["PersonLabel", "Organisation", "evaluation"])
     # Calculate compatibility scores
     similarity_matrix = calculate_compatibility_scores_on_five(df_scores)
+    #st.dataframe(data=similarity_matrix)
+    minim_comp = similarity_matrix.min().min()
+    index_min = similarity_matrix.idxmin()
+    #st.write(max_comp
+    st.write(f"Le score de compatibilité le plus bas est {minim_comp} entre {index_min[0]} et {index_min[1]}")
+    #st.write(minim_comp)
     comp_col1, comp_col2 = st.columns(2)
     with comp_col1:
         st.subheader("Réseau de compatibilité")

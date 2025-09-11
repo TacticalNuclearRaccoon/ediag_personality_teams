@@ -242,6 +242,16 @@ def calculate_compatibility_scores_on_five(df, threshold=70, bridge_bonus=20, pe
 
     return compatibility_matrix
 
+# function to get team members with compatibility above a certain threshold
+def dream_team(person, df, treshold):
+  similarity_matrix = calculate_compatibility_scores_on_five(df)
+  new = similarity_matrix.loc[similarity_matrix[person] > treshold]
+  people = new.index.values.tolist()
+  if person in people:
+      people.remove(person)
+      return people
+  else:
+      return people
 
 data = fetch_results_from_database()
 
@@ -327,7 +337,7 @@ elif selected_view == "Styles dominants":
     # Debug: Show raw dominant values for each person
     #st.write("Raw dominant values per person:")
     #st.write(df[['A', 'B', 'C', 'D']])
-    st.write("Cadran dominant calculé par personne:")
+    st.write("Quadrant dominant calculé par personne:")
     st.write(df['Dominant'])
     
     # Create pie chart of dominant styles distribution
@@ -335,11 +345,11 @@ elif selected_view == "Styles dominants":
     
     # For debugging/displaying the counts
     dominant_counts_df_display = dominant_counts_series.reset_index()
-    dominant_counts_df_display.columns = ['Cadran', 'Nombre de personnes']
+    dominant_counts_df_display.columns = ['Quadrant', 'Nombre de personnes']
 
     # Get values and names as lists
     df_values = dominant_counts_df_display['Nombre de personnes'].tolist()
-    df_names = dominant_counts_df_display['Cadran'].tolist()
+    df_names = dominant_counts_df_display['Quadrant'].tolist()
 
     # Define colors for each quadrant
     quadrant_colors = {
@@ -363,7 +373,7 @@ elif selected_view == "Styles dominants":
         wedgeprops={'edgecolor':'white', 'width':0.7},
     )
     ax.axis('equal')
-    ax.set_title("Distribution of Dominant Cadran", color='white', fontsize=12)
+    ax.set_title("Distribution of Dominant Quadrant", color='white', fontsize=12)
     col1, col2 = st.columns(2)
     with col1:
         st.pyplot(fig)
@@ -379,13 +389,13 @@ elif selected_view == "Déviations":
     # Standardize (Z-score) so deviations stand out
     df_norm = (df_scores - df_scores.mean()) / df_scores.std()
 
-    melted = df[["A", "B", "C", "D"]].melt(var_name="Cadran", value_name="Score")
+    melted = df[["A", "B", "C", "D"]].melt(var_name="Quadrant", value_name="Score")
     # this same data can be used in the boxplot
     quadrant_data = [
-        melted[melted['Cadran'] == 'A']['Score'].values,
-        melted[melted['Cadran'] == 'B']['Score'].values,
-        melted[melted['Cadran'] == 'C']['Score'].values,
-        melted[melted['Cadran'] == 'D']['Score'].values
+        melted[melted['Quadrant'] == 'A']['Score'].values,
+        melted[melted['Quadrant'] == 'B']['Score'].values,
+        melted[melted['Quadrant'] == 'C']['Score'].values,
+        melted[melted['Quadrant'] == 'D']['Score'].values
     ]
 
     quadrant_labels = ['A', 'B', 'C', 'D']
@@ -411,7 +421,7 @@ elif selected_view == "Déviations":
         # Calculate outlier boundaries and identify outliers
         outlier_info = []
         for quadrant in quadrant_labels:
-            scores = melted[melted['Cadran'] == quadrant]['Score']
+            scores = melted[melted['Quadrant'] == quadrant]['Score']
             Q1 = scores.quantile(0.25)
             Q3 = scores.quantile(0.75)
             IQR = Q3 - Q1
@@ -422,7 +432,7 @@ elif selected_view == "Déviations":
         for index, row in df.iterrows():
             score = row[quadrant]
             if score < lower_bound or score > upper_bound:
-                outlier_info.append(f"- '{index}' a un score divergeant {score} pour le Cadran {quadrant}")
+                outlier_info.append(f"- '{index}' a un score divergeant {score} pour le Quadrant {quadrant}")
 
         if outlier_info:
             for info in outlier_info:
@@ -432,7 +442,7 @@ elif selected_view == "Déviations":
 
 
     # Dumbbell Plot or Slope Chart (Person vs. Team Average)
-    st.subheader("Deviation par rapport à la moyenne de l'équipe par Cadran")
+    st.subheader("Deviation par rapport à la moyenne de l'équipe par Quadrant")
     st.write("Score de la personne et la déviation par rapport à la moyenne de l'équipe")
     categories = ["A", "B", "C", "D"]
     avg_scores = df_scores.mean()
@@ -441,7 +451,7 @@ elif selected_view == "Déviations":
         axs[i].hlines(y=df_scores.index, xmin=avg_scores[cat], xmax=df_scores[cat], color='grey', alpha=0.5)
         axs[i].plot(df_scores[cat], df_scores.index, "o", label="Score")
         axs[i].vlines(avg_scores[cat], 0, len(df_scores), color="red", linestyles="dashed", label="Moyenne")
-        axs[i].set_title(f"Cadran {cat}")
+        axs[i].set_title(f"Quadrant {cat}")
         axs[i].set_xlabel("Score")
         if i == 0:
             axs[i].legend()
@@ -462,13 +472,18 @@ elif selected_view == "Déviations":
 elif selected_view == "Compatibilité":
     st.subheader("Analyse de compatibilité entre les membres de l'équipe")
     df_scores = df.drop(columns=["PersonLabel", "Organisation", "evaluation"])
+    df_scores.drop_duplicates(inplace=True)
+    st.download_button(
+        label="Télécharger les scores bruts",
+        data=df_scores.to_csv(index=True).encode('utf-8'),
+        file_name='hermann_scores.csv',
+        mime='text/csv',
+    )
     # Calculate compatibility scores
     similarity_matrix = calculate_compatibility_scores_on_five(df_scores)
     #st.dataframe(data=similarity_matrix)
     minim_comp = similarity_matrix.min().min()
     index_min = similarity_matrix.idxmin()
-    #st.write(max_comp
-    st.write(f"Le score de compatibilité le plus bas est {minim_comp} entre {index_min[0]} et {index_min[1]}")
     #st.write(minim_comp)
     comp_col1, comp_col2 = st.columns(2)
     with comp_col1:
@@ -490,6 +505,22 @@ elif selected_view == "Compatibilité":
         st.markdown("""
 * Chaque case représente le score de compatibilité entre deux membres de l'équipe.
 * Les scores vont de 0 (aucune compatibilité) à 5 (compatibilité parfaite).""")
+        
+    # Dream team
+    st.subheader("Créer des sous équipes selon la compatibilité")
+    df['Dominant'] = df[['A', 'B', 'C', 'D']].idxmax(axis=1)
+    dominant_df = df[['Dominant']].copy()
+    #st.dataframe(dominant_df)
+    target_person = st.selectbox("Sélectionner un membre de l'équipe pour créer une sous-équipe:", df_scores.index.tolist(), key="dream_team_person")
+    threshold = st.slider("Seuil de compatibilité (1-5):", min_value=1.0, max_value=5.0, value=3.0, step=0.1, key="dream_team_threshold")
+    if target_person:
+        team_members = dream_team(target_person, df_scores, threshold)
+        if team_members:
+            st.write(f"Membres de l'équipe compatibles avec {target_person} (seuil ≥ {threshold}):")
+            for member in team_members:
+                st.write(f"- {member} (Quadrant dominant: {df.loc[member, 'Dominant']})")
+        else:
+            st.write(f"Aucun membre de l'équipe n'a une compatibilité ≥ {threshold} avec {target_person}.")
 
 elif selected_view == "Les autres":
     selected_person = st.selectbox("Sélectionner un membre de l'équipe:", df.index.tolist())

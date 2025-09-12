@@ -592,6 +592,13 @@ elif selected_view == "Compatibilité":
 
     st.write(f"l'équipe la plus compatible: {best_team}")
     st.write(f"Score max de compatibilité (de cette équipe): {best_average_similarity}")
+    new_matrix = similarity_matrix.filter(best_team)
+    new_matrix.reset_index(inplace=True)
+    team_matrix = new_matrix[new_matrix['Person'].isin(best_team)]
+    #st.dataframe(data=team_matrix)
+    team_matrix.set_index('Person', inplace=True)
+    fig_team = visualize_compatibility_network_colored(team_matrix)
+    st.pyplot(fig_team)
 
 
 elif selected_view == "Les autres":

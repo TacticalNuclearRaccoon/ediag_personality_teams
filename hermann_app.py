@@ -309,6 +309,34 @@ def radar_chart(name, scores, color='lightblue'):
     )
     return fig
 
+def calculate_team_average_similarity(team_members, similarity_matrix):
+    """
+    Calculates the average pairwise similarity score for a given team.
+
+    Args:
+        team_members: A list of strings representing the names of the people in the team.
+        similarity_matrix: A pandas DataFrame containing the pairwise similarity scores.
+
+    Returns:
+        The average pairwise similarity score for the team, excluding self-similarity.
+        Returns 0 if the team size is 1 or less.
+    """
+    n = len(team_members)
+    if n <= 1:
+        return 0.0
+
+    total_similarity = 0
+    num_pairs = 0
+
+    for i in range(n):
+        for j in range(i + 1, n):
+            person1 = team_members[i]
+            person2 = team_members[j]
+            total_similarity += similarity_matrix.loc[person1, person2]
+            num_pairs += 1
+
+    return total_similarity / num_pairs
+
 # View 1: Individual radar chart
 if selected_view == "Profil individuel":
     selected_person = st.selectbox("Sélectionner un membre de l'équipe:", df.index.tolist())
@@ -521,6 +549,50 @@ elif selected_view == "Compatibilité":
                 st.write(f"- {member} (Quadrant dominant: {df.loc[member, 'Dominant']})")
         else:
             st.write(f"Aucun membre de l'équipe n'a une compatibilité ≥ {threshold} avec {target_person}.")
+
+    # Dream team with a given number of members
+    st.subheader("Créer une sous-équipe avec un nombre défini de membres")
+    average_similarity_scores = similarity_matrix.mean(axis=1).sort_values(ascending=False)
+    #st.write(average_similarity_scores)
+
+    dream_team_size = st.slider("Taille de la sous-équipe:", min_value=2, max_value=df.shape[0], value=4, step=1, key="dream_team_size")
+    n = dream_team_size
+    # Initial team: top n based on average similarity
+    initial_team = average_similarity_scores.head(n).index.tolist()
+    candidate_teams = [initial_team]
+
+    # Generate more candidate teams: teams centered around top individuals and their most compatible peers
+    top_people = average_similarity_scores.head(5).index.tolist() # Consider top 5 for centering
+    for person in top_people:
+        # Find n-1 most compatible people for this person, excluding self
+        most_compatible = similarity_matrix.loc[person].drop(person).sort_values(ascending=False).head(n-1).index.tolist()
+        candidate_team = [person] + most_compatible
+        candidate_teams.append(candidate_team)
+
+    # Remove duplicate teams (if any)
+    unique_candidate_teams = []
+    for team in candidate_teams:
+        if sorted(team) not in [sorted(t) for t in unique_candidate_teams]:
+            unique_candidate_teams.append(team)
+
+    print("Generated Candidate Teams:")
+    for i, team in enumerate(unique_candidate_teams):
+        st.write(f"Team {i+1}: {team}")
+
+    best_team = None
+    best_average_similarity = -1
+
+    for team in unique_candidate_teams:
+        current_average_similarity = calculate_team_average_similarity(team, similarity_matrix)
+        if current_average_similarity > best_average_similarity:
+            best_average_similarity = current_average_similarity
+            best_team = team
+
+    st.subheader(f"Meilleure sous-équipe de taille {n} basée sur la compatibilité moyenne")
+
+    st.write(f"l'équipe la plus compatible: {best_team}")
+    st.write(f"Score max de compatibilité (de cette équipe): {best_average_similarity}")
+
 
 elif selected_view == "Les autres":
     selected_person = st.selectbox("Sélectionner un membre de l'équipe:", df.index.tolist())

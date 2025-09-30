@@ -130,6 +130,74 @@ def visualize_compatibility_network_colored(compatibility_matrix, threshold=1):
     plt.tight_layout()
     return fig
 
+# New function: person-centered compatibility network
+def visualize_person_centered_network_colored(compatibility_matrix, center_person, threshold=1):
+    """
+    Visualize compatibility network with a selected person in the center.
+    Only shows edges between center_person and others (no edges between other people).
+
+    Args:
+        compatibility_matrix (pd.DataFrame): Pairwise compatibility scores.
+        center_person (str): The person to place in the center.
+        threshold (float): Minimum score to draw an edge.
+    """
+    G = nx.Graph()
+    # Add center node
+    G.add_node(center_person)
+    # Add other nodes and edges only to center_person
+    for person in compatibility_matrix.index:
+        if person != center_person:
+            score = compatibility_matrix.loc[center_person, person]
+            if score >= threshold:
+                G.add_node(person)
+                G.add_edge(center_person, person, weight=score)
+
+    # Layout: center node at (0,0), others in a circle around
+    n = len(G.nodes())
+    pos = {}
+    pos[center_person] = (0, 0)
+    angle_step = 2 * np.pi / (n - 1) if n > 1 else 0
+    radius = 3
+    idx = 0
+    for node in G.nodes():
+        if node == center_person:
+            continue
+        angle = idx * angle_step
+        x = radius * np.cos(angle)
+        y = radius * np.sin(angle)
+        pos[node] = (x, y)
+        idx += 1
+
+    # Edge weights and colors
+    edge_weights = [G[u][v]['weight'] for u, v in G.edges()]
+    edge_widths = [w / 1 for w in edge_weights]
+    colors = ['red', 'tomato', 'darkorange', 'orange', 'yellow','y', 'yellowgreen', 'limegreen', 'darkgreen']
+    bounds = [1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5]
+    cmap = mcolors.ListedColormap(colors)
+    norm = mcolors.BoundaryNorm(bounds, cmap.N)
+    edge_colors = [cmap(norm(score)) for score in edge_weights]
+
+    # Draw the network
+    fig, ax = plt.subplots(figsize=(8, 8))
+    nx.draw_networkx_nodes(G, pos, node_color=['lightblue' if n != center_person else 'gold' for n in G.nodes()], edgecolors='black', node_size=1000)
+    nx.draw_networkx_edges(G, pos, width=edge_widths, edge_color=edge_colors)
+    nx.draw_networkx_labels(G, pos, font_weight='bold', font_size=12)
+
+    # Edge labels
+    edge_labels = {(u, v): f"{G[u][v]['weight']:.0f}" for u, v in G.edges()}
+    nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, font_size=8, font_color='black')
+
+    # Colorbar legend
+    sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+    sm.set_array([])
+    cbar = fig.colorbar(sm, shrink=0.8, ax=ax)
+    cbar.set_label('Compatibility Score')
+
+    plt.title(f"Compatibilité centrée sur {center_person} (Seuil ≥ {threshold})")
+    plt.axis('off')
+    plt.tight_layout()
+    return fig
+
 # functions to create compatibility matrix
 # helper function to get dominant quadrant
 def get_dominant_quadrant(row, threshold=70):
@@ -268,7 +336,7 @@ df = df.set_index("Person")
 #st.dataframe(data=df)
 # Sidebar for user interaction
 
-selected_view = st.sidebar.radio("Choisir une analyse:", ["Profil individuel", "Profil moyen de l'équipe", "Styles dominants", "Déviations", "Les autres", "Compatibilité"])
+selected_view = st.sidebar.radio("Choisir une analyse:", ["Profil individuel", "Profil moyen de l'équipe", "Styles dominants", "Déviations", "Les autres", "Compatibilité", "Communication"])
 
 
 # Radar chart helper
@@ -663,3 +731,58 @@ elif selected_view == "Les autres":
                                 st.warning(f"Le profil de {name} n'a pas pu être trouvé.")
     else:
         st.warning("Veuillez sélectionner un membre de l'équipe.")
+
+elif selected_view == "Communication":
+    st.subheader("Les modes de communication à privilégier dans l'équipe")
+    comm_people = df.index.tolist()
+    comm_person = st.selectbox("Sélectionner un membre de l'équipe:", comm_people, key="comm_person")
+    df_scores = df.drop(columns=["PersonLabel", "Organisation", "evaluation"])
+    df_scores.drop_duplicates(inplace=True)
+    # Calculate compatibility scores
+    similarity_matrix = calculate_compatibility_scores_on_five(df_scores)
+    #st.dataframe(data=similarity_matrix)
+    minim_comp = similarity_matrix.min().min()
+    index_min = similarity_matrix.idxmin()
+    #st.write(minim_comp)
+    comp_col1, comp_col2 = st.columns(2)
+    with comp_col1:
+        st.subheader("Réseau de compatibilité")
+        fig = visualize_person_centered_network_colored(similarity_matrix, comm_person)
+        st.pyplot(fig)
+        st.markdown("""
+* Chaque nœud représente un membre de l'équipe.
+* Les arêtes représentent la compatibilité entre les membres.
+* La largeur des arêtes est proportionnelle au score de compatibilité.
+* Les couleurs des arêtes vont du rouge (faible compatibilité) au vert (forte compatibilité).
+* Le score de compatibilité est indiqué par le texte sur les arêtes""")
+    with comp_col2:
+        st.subheader("Modes de communication à privilégier")
+        target_people = comm_people.remove(comm_person)
+        df['Dominant'] = df[['A', 'B', 'C', 'D']].idxmax(axis=1)  
+        dominant_df = df[['Dominant']].copy()
+        st.markdown(f"**{comm_person}** est pilote : {df.loc[comm_person, 'Dominant']}")
+
+        for person in comm_people:
+            if df.loc[person, 'Dominant'] == "A":
+                comm_style = "Numérico-analytique, structuré, logique, factuel"
+            elif df.loc[person, 'Dominant'] == "B":
+                comm_style = "Organisé, planifié, méthodique, précis"
+            elif df.loc[person, 'Dominant'] == "C":
+                comm_style = "Communicatif, relationnel, conversations"
+            elif df.loc[person, 'Dominant'] == "D":
+                comm_style = "Schématique, sythètique, vision globale, idées"
+            score = similarity_matrix.loc[comm_person, person]
+            if score >= 4.5:
+                comm_quality = "Communication fluide et naturelle"
+            elif score >= 3.5:
+                comm_quality = "Communication efficace avec quelques ajustements"
+            elif score >= 2.5:
+                comm_quality = "Communication possible mais nécessite des efforts conscients"
+            elif score >= 1.5:
+                comm_quality = "Communication difficile, nécessite une adaptation significative"
+            else:
+                comm_quality = "Communication très difficile, risque de malentendus fréquents"
+
+            st.markdown(f"""
+- **{person}** (score: {score}): *{comm_quality}*. Avec {person} il faut privilégier : {comm_style}.""")
+            

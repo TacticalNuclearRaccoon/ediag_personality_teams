@@ -35,7 +35,7 @@ def fetch_results_from_database():
         "Content-Type": "application/json",
     }
     params = {
-        "select": "user,organisation,A_score,B_score,C_score,D_score, evaluation"
+        "select": "id,user,organisation,A_score,B_score,C_score,D_score, evaluation"
     }
     response = requests.get(url, headers=headers, params=params)
     print(response.status_code, response.text)
@@ -328,9 +328,13 @@ unique_organisations = list(set(organisations))
 selected_organisation = st.selectbox("Select organisation", unique_organisations)
 df=pd.DataFrame([row for row in data if row["organisation"] == selected_organisation])
 df.rename(columns={"user": "Person", "organisation": "Organisation", "A_score": "A", "B_score": "B", "C_score": "C", "D_score": "D"}, inplace=True)
-# there can be 2 people with the same within the same organisation
-df["PersonLabel"] = df.apply(lambda row: f"{row.name}: {row['Person']} ({row['Organisation']})", axis=1)
-df = df.set_index("Person")
+# Create a unique label combining person name and ID to handle duplicate names
+df["PersonLabel"] = df.apply(lambda row: f"{row['Person']} (ID: {row['id']})", axis=1)
+# Set the PersonLabel as index (which is now unique)
+df = df.set_index("PersonLabel")
+# Keep the original person name and ID as columns for reference
+df['PersonName'] = df['Person']
+df['PersonID'] = df['id']
 #df["Dominant"] = df.idxmax(axis=1)
 #st.subheader("🧪 Raw Data Preview")
 #st.dataframe(data=df)
@@ -567,8 +571,8 @@ elif selected_view == "Déviations":
 
 elif selected_view == "Compatibilité":
     st.subheader("Analyse de compatibilité entre les membres de l'équipe")
-    df_scores = df.drop(columns=["PersonLabel", "Organisation", "evaluation"])
-    df_scores.drop_duplicates(inplace=True)
+    df_scores = df.drop(columns=["PersonLabel", "Organisation", "evaluation", "Person", "id", "PersonName", "PersonID"], errors='ignore')
+    # With unique index, drop_duplicates should not be needed, but kept for safety
     st.download_button(
         label="Télécharger les scores bruts",
         data=df_scores.to_csv(index=True).encode('utf-8'),
@@ -736,8 +740,8 @@ elif selected_view == "Communication":
     st.subheader("Les modes de communication à privilégier dans l'équipe")
     comm_people = df.index.tolist()
     comm_person = st.selectbox("Sélectionner un membre de l'équipe:", comm_people, key="comm_person")
-    df_scores = df.drop(columns=["PersonLabel", "Organisation", "evaluation"])
-    df_scores.drop_duplicates(inplace=True)
+    df_scores = df.drop(columns=["PersonLabel", "Organisation", "evaluation", "Person", "id", "PersonName", "PersonID"], errors='ignore')
+    # With unique index, drop_duplicates should not be needed, but kept for safety
     # Calculate compatibility scores
     similarity_matrix = calculate_compatibility_scores_on_five(df_scores)
     #st.dataframe(data=similarity_matrix)

@@ -20,7 +20,7 @@ icon = "Favicon_2x.ico"
 st.set_page_config(layout='wide', page_icon=icon, page_title="Outil d’analyse Bousole des personnalités")
 
 try:
-    st.image("Banniere argios.png", use_container_width=True)
+    st.image("Banniere argios.png")
 except:
     st.image("Banniere argios.png", use_column_width=True)
 
@@ -43,6 +43,13 @@ def fetch_results_from_database():
     return response.json()
 
 ### Functions for compatibility graphs
+# helper function to extract just the name from PersonLabel
+def extract_name(person_label):
+    """Extract just the name from PersonLabel format: 'Name (ID: 123)' -> 'Name'"""
+    if " (ID:" in str(person_label):
+        return str(person_label).split(" (ID:")[0]
+    return str(person_label)
+
 # helper function to force regular polygons
 def polygon_layout(G, radius=3):
     """
@@ -110,10 +117,12 @@ def visualize_compatibility_network_colored(compatibility_matrix, threshold=1):
     edge_colors = [cmap(norm(score)) for score in edge_weights]
 
     # Draw the network
-    fig, ax = plt.subplots(figsize=(8, 8))
+    fig, ax = plt.subplots(figsize=(6, 6))
     nx.draw_networkx_nodes(G, pos, node_color='lightblue', edgecolors='black', node_size=1000)
     nx.draw_networkx_edges(G, pos, width=edge_widths, edge_color=edge_colors)
-    nx.draw_networkx_labels(G, pos, font_weight='bold', font_size=12)
+    # Use shortened names for labels
+    labels = {node: extract_name(node) for node in G.nodes()}
+    nx.draw_networkx_labels(G, pos, labels=labels, font_weight='bold', font_size=12)
 
     # Edge labels
     edge_labels = {(u, v): f"{G[u][v]['weight']:.0f}" for u, v in G.edges()}
@@ -178,10 +187,12 @@ def visualize_person_centered_network_colored(compatibility_matrix, center_perso
     edge_colors = [cmap(norm(score)) for score in edge_weights]
 
     # Draw the network
-    fig, ax = plt.subplots(figsize=(8, 8))
+    fig, ax = plt.subplots(figsize=(6, 6))
     nx.draw_networkx_nodes(G, pos, node_color=['lightblue' if n != center_person else 'gold' for n in G.nodes()], edgecolors='black', node_size=1000)
     nx.draw_networkx_edges(G, pos, width=edge_widths, edge_color=edge_colors)
-    nx.draw_networkx_labels(G, pos, font_weight='bold', font_size=12)
+    # Use shortened names for labels
+    labels = {node: extract_name(node) for node in G.nodes()}
+    nx.draw_networkx_labels(G, pos, labels=labels, font_weight='bold', font_size=12)
 
     # Edge labels
     edge_labels = {(u, v): f"{G[u][v]['weight']:.0f}" for u, v in G.edges()}
@@ -482,14 +493,17 @@ elif selected_view == "Styles dominants":
 
 # View 5: Déviations
 elif selected_view == "Déviations":
-    # Heatmap
-    df_scores = df.drop(columns=["Organisation", "evaluation"], errors='ignore')
+    # Heatmap - only keep numeric score columns for normalization
+    df_scores = df[["A", "B", "C", "D"]].copy()
+
     #st.dataframe(data=df_scores)
 
     # Standardize (Z-score) so deviations stand out
     df_norm = (df_scores - df_scores.mean()) / df_scores.std()
 
-    melted = df[["A", "B", "C", "D"]].melt(var_name="Quadrant", value_name="Score")
+    # Reset index to preserve PersonLabel as a column, then melt
+    df_melt = df[["A", "B", "C", "D"]].reset_index()
+    melted = df_melt.melt(id_vars="PersonLabel", value_vars=["A", "B", "C", "D"], var_name="Quadrant", value_name="Score")
     # this same data can be used in the boxplot
     quadrant_data = [
         melted[melted['Quadrant'] == 'A']['Score'].values,
@@ -501,9 +515,11 @@ elif selected_view == "Déviations":
     quadrant_labels = ['A', 'B', 'C', 'D']
 
     
-    plt.figure(figsize=(3, 3))
-    fig_diverge, ax_diverge = plt.subplots(figsize=(5,5))
-    sns.heatmap(df_norm, annot=df_scores, cmap="coolwarm", center=0, cbar_kws={'label': 'Z-score'}, fmt='.1f')
+    plt.figure(figsize=(4, 4))
+    fig_diverge, ax_diverge = plt.subplots(figsize=(4, 4))
+    sns.heatmap(df_norm, annot=df_scores, cmap="coolwarm", center=0, cbar_kws={'label': 'Z-score'}, fmt='.1f', ax=ax_diverge)
+    # Set shortened names for y-axis labels
+    ax_diverge.set_yticklabels([extract_name(label.get_text()) for label in ax_diverge.get_yticklabels()])
     st.write("Valeurs divergeantes mis en évidence par couleur")
     col_div1, col_div2 = st.columns(2)
     with col_div1:
@@ -546,13 +562,18 @@ elif selected_view == "Déviations":
     st.write("Score de la personne et la déviation par rapport à la moyenne de l'équipe")
     categories = ["A", "B", "C", "D"]
     avg_scores = df_scores.mean()
-    fig, axs = plt.subplots(1, 4, figsize=(18, 5), sharey=True)
+    fig, axs = plt.subplots(1, 4, figsize=(12, 4), sharey=True)
+    # Create shortened labels for y-axis
+    shortened_labels = [extract_name(label) for label in df_scores.index]
     for i, cat in enumerate(categories):
         axs[i].hlines(y=df_scores.index, xmin=avg_scores[cat], xmax=df_scores[cat], color='grey', alpha=0.5)
         axs[i].plot(df_scores[cat], df_scores.index, "o", label="Score")
         axs[i].vlines(avg_scores[cat], 0, len(df_scores), color="red", linestyles="dashed", label="Moyenne")
         axs[i].set_title(f"Quadrant {cat}")
         axs[i].set_xlabel("Score")
+        # Set shortened y-axis labels
+        axs[i].set_yticks(range(len(df_scores.index)))
+        axs[i].set_yticklabels(shortened_labels)
         if i == 0:
             axs[i].legend()
     st.pyplot(fig)
@@ -598,9 +619,12 @@ elif selected_view == "Compatibilité":
 * Le score de compatibilité est indiqué par le texte sur les arêtes""")
     with comp_col2:
         st.subheader("Matrice de compatibilité")
-        plt.figure(figsize=(10, 10))
-        fig_comp, ax_comp = plt.subplots(figsize=(8,8))
-        sns.heatmap(similarity_matrix, annot=True, cmap='BuPu', fmt=".1f")
+        plt.figure(figsize=(6, 6))
+        fig_comp, ax_comp = plt.subplots(figsize=(6, 6))
+        sns.heatmap(similarity_matrix, annot=True, cmap='BuPu', fmt=".1f", ax=ax_comp)
+        # Set shortened names for both axes
+        ax_comp.set_xticklabels([extract_name(label.get_text()) for label in ax_comp.get_xticklabels()], rotation=45, ha='right')
+        ax_comp.set_yticklabels([extract_name(label.get_text()) for label in ax_comp.get_yticklabels()])
         st.pyplot(fig_comp)
         st.markdown("""
 * Chaque case représente le score de compatibilité entre deux membres de l'équipe.
@@ -666,9 +690,11 @@ elif selected_view == "Compatibilité":
     st.write(f"Score max de compatibilité (de cette équipe): {best_average_similarity}")
     new_matrix = similarity_matrix.filter(best_team)
     new_matrix.reset_index(inplace=True)
-    team_matrix = new_matrix[new_matrix['Person'].isin(best_team)]
+    # Get the column name from the index (will be 'PersonLabel' or the index name)
+    index_col_name = new_matrix.columns[0]  # First column after reset_index is the former index
+    team_matrix = new_matrix[new_matrix[index_col_name].isin(best_team)]
     #st.dataframe(data=team_matrix)
-    team_matrix.set_index('Person', inplace=True)
+    team_matrix.set_index(index_col_name, inplace=True)
     fig_team = visualize_compatibility_network_colored(team_matrix)
     st.pyplot(fig_team)
 
@@ -722,7 +748,7 @@ elif selected_view == "Les autres":
                             fig_by_other = radar_chart(name, scores_by_other, color='mediumpurple')
                             title_by_other = f"Profil de {name}<br>(vu par {selected_person})"
                             fig_by_other.update_layout(title=dict(text=title_by_other, font=dict(size=16)))
-                            st.plotly_chart(fig_by_other, use_container_width=True)
+                            st.plotly_chart(fig_by_other)
 
                         with col2:
                             if name in df.index:
@@ -730,7 +756,7 @@ elif selected_view == "Les autres":
                                 fig_real = radar_chart(name, real_scores, color='lightblue')
                                 title_real = f"Profil de {name}<br>(auto-évaluation)"
                                 fig_real.update_layout(title=dict(text=title_real, font=dict(size=16)))
-                                st.plotly_chart(fig_real, use_container_width=True)
+                                st.plotly_chart(fig_real)
                             else:
                                 st.warning(f"Le profil de {name} n'a pas pu être trouvé.")
     else:

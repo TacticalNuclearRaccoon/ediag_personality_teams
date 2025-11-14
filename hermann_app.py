@@ -483,7 +483,7 @@ elif selected_view == "Styles dominants":
 # View 5: Déviations
 elif selected_view == "Déviations":
     # Heatmap
-    df_scores = df.drop(columns=["PersonLabel", "Organisation", "evaluation"])
+    df_scores = df.drop(columns=["Organisation", "evaluation"], errors='ignore')
     #st.dataframe(data=df_scores)
 
     # Standardize (Z-score) so deviations stand out

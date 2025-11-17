@@ -700,6 +700,7 @@ elif selected_view == "Compatibilité":
 
 
 elif selected_view == "Les autres":
+    people_to_select = df.index.tolist()
     selected_person = st.selectbox("Sélectionner un membre de l'équipe:", df.index.tolist())
     if selected_person:
         st.header(f"L'équipe selon {selected_person}")

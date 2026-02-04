@@ -7,3 +7,6 @@ matplotlib
 requests
 networkx
 scikit-learn
+numpy
+streamlit-aggrid
+kaleido

@@ -2,3 +2,4 @@
 env
 # secrets
 .streamlit/secrets.toml
+team_graphs
